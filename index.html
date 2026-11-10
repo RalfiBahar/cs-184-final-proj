@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silver Lining: A Volumetric Cloud and God-Ray Renderer</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.5; max-width: 860px; margin: 2rem auto; padding: 0 1.2rem; color: #1b1b1b; }
+  h1 { font-size: 1.9rem; margin-bottom: .3rem; }
+  h2 { font-size: 1.35rem; border-bottom: 1px solid #ccc; padding-bottom: .2rem; margin-top: 2rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.4rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border: 1px solid #bbb; padding: .5rem .6rem; text-align: left; vertical-align: top; font-size: .95rem; }
+  th { background: #f0f0f0; }
+  td ul { margin: 0; padding-left: 1.1rem; }
+  figure { margin: 1.2rem 0; text-align: center; }
+  figure img { max-width: 100%; height: auto; }
+  figcaption { font-size: .85rem; color: #444; margin-top: .4rem; }
+  .refs p { margin: .5rem 0; word-break: break-word; }
+  .meta { color: #444; font-size: .95rem; }
+  @media print { body { margin: 0; max-width: none; font-size: 10.5pt; } h2 { page-break-after: avoid; } tr, figure { page-break-inside: avoid; } a { color: #1b1b1b; } }
+</style>
+</head>
+<body>
+
+<h1>Silver Lining: A Volumetric Cloud and God-Ray Renderer</h1>
+<p class="meta">CS 184/284A Final Project Proposal. Proposal webpage: <a href="https://YOUR-USERNAME.github.io/YOUR-REPO/">https://YOUR-USERNAME.github.io/YOUR-REPO/</a></p>
+
+<h2>1. Title, Summary and Team Members</h2>
+<p><strong>Project:</strong> Silver Lining</p>
+<p><strong>Summary:</strong> We extend our CS 184 Homework 3 path tracer with participating media. We add delta-tracking volumetric path tracing through a procedurally animated, heterogeneous density field and a Henyey-Greenstein phase function. Our target scenes are a backlit cloud with a silver lining, and colored light shafts (god rays) streaming through a window or stained glass into a drifting cloud.</p>
+<p><strong>Team members:</strong> Diego Jiang, Ralfi Bahar, Yuheng Wang, Diego Vargas de Souza</p>
+<p><strong>Course enrollment:</strong> CS184</p>
+
+<figure>
+  <img src="images/crepuscular-rays.jpg" alt="Sunbeams breaking through clouds over a landscape">
+  <figcaption>Reference photo (not our render): &ldquo;Crepuscular rays over the region of Tikve&scaron;&rdquo; by Kiril Simeonovski, via <a href="https://commons.wikimedia.org/wiki/File:%D0%A1%D0%BE%D0%BD%D1%87%D0%B5%D0%B2%D0%B8_%D0%B7%D1%80%D0%B0%D1%86%D0%B8_%D0%BD%D0%B0%D0%B4_%D0%A2%D0%B8%D0%BA%D0%B2%D0%B5%D1%88_(cropped).jpg">Wikimedia Commons</a>, licensed <a href="https://creativecommons.org/licenses/by/4.0">CC BY 4.0</a>. Cropped.</figcaption>
+</figure>
+
+<h2>2. Problem Description</h2>
+<p><strong>Context.</strong> Our HW3 renderer only handles light interacting at surfaces. Rays travel through empty space and change only when they hit a BSDF. Real clouds, fog, smoke, and atmospheric light shafts need light to be absorbed and scattered inside a volume. A surface-only renderer cannot produce them, because there is no surface for the light to interact with.</p>
+<p><strong>Why it matters.</strong> Volumetric scattering is what makes skies, clouds, haze, and &ldquo;sunbeams through a window&rdquo; look real. Production renderers treat it as a core feature. It also exercises the same Monte Carlo machinery we learned in class (importance sampling, unbiased estimators, variance) in a new setting.</p>
+<p><strong>What is challenging.</strong></p>
+<ul>
+  <li><strong>Unbiased sampling in heterogeneous media.</strong> The distance to the next scattering event has no closed form when density varies in space. We need null-collision methods such as delta tracking, and we must get the probabilities right to avoid bias.</li>
+  <li><strong>Noise from multiple scattering.</strong> The bright, soft look of a cloud comes from many bounces inside the medium. Path length and variance grow with optical thickness.</li>
+  <li><strong>Strongly forward-scattering phase functions.</strong> Cloud droplets scatter mostly forward. This produces the silver lining, but it makes the light-transport integrand peaky and noisy, so good phase function sampling and light sampling matter.</li>
+  <li><strong>Light shafts.</strong> Shafts form when occluders (window frames, glass) shape the light entering a medium. Connecting scattering points to the light through occluders needs careful shadow-ray transmittance estimation. Connecting through refractive glass is harder still.</li>
+  <li><strong>Rendering time.</strong> Volumes need many more ray-density lookups per path than surfaces. We must keep animation frames affordable on laptops.</li>
+</ul>
+<p><strong>General approach.</strong> We add a medium abstraction to our existing path tracer. We validate it on simple cases with known answers (homogeneous media, analytic transmittance). Then we move to a noise-based heterogeneous cloud, add lighting for the silver lining and shafts, and finally animate the density field. Riskier optical effects (dispersion, spectral rendering) come last and are optional.</p>
+
+<h3>Starting Point vs. What We Build</h3>
+<p><strong>What we start with (our HW3 Project 3-1 path tracer, C++):</strong></p>
+<ul>
+  <li>Surface path tracing with global illumination (depth cap and Russian roulette)</li>
+  <li>Ray generation, ray-scene intersection, and a BVH</li>
+  <li>Materials: diffuse and emission BSDFs only. Our HW3-1 code has no mirror, glass, or microfacet BSDFs, and no environment light.</li>
+  <li>Area lights, direct lighting with light sampling, and adaptive sampling</li>
+</ul>
+<p><strong>What we build ourselves:</strong></p>
+<ul>
+  <li>A medium and volume-integration layer (absorption and scattering coefficients, transmittance, medium transitions at boundaries)</li>
+  <li>Density grids and procedural noise (Perlin/Worley-style fractal noise) for the cloud density</li>
+  <li>Henyey-Greenstein phase function evaluation and importance sampling</li>
+  <li>Delta tracking (Woodcock tracking) for free-flight sampling, plus ratio tracking for shadow-ray transmittance</li>
+  <li>Light-shaft sampling (volumetric next-event estimation toward the light through occluders)</li>
+  <li>Time-varying density animation and an animation render script</li>
+  <li>A simple non-refracting tinted-transmission material (a thin pane that multiplies light by a per-channel color), and later, as a stretch goal, refractive and dispersive glass</li>
+  <li>An evaluation harness: convergence plots, timing runs, and analytic checks</li>
+</ul>
+
+<h2>3. Goals and Deliverables</h2>
+<h3>3.1 What we plan to deliver (baseline)</h3>
+<p>We believe this is achievable in about four weeks, with buffer for problems.</p>
+<ol>
+  <li><strong>Homogeneous medium.</strong> Absorption and scattering, with free-flight sampling and transmittance. Validated against the analytic slab transmittance.</li>
+  <li><strong>Henyey-Greenstein phase function with importance sampling.</strong> Validated by comparing sampled-direction histograms to the pdf and checking that the mean cosine equals g.</li>
+  <li><strong>Heterogeneous medium with delta tracking</strong> through a density grid, with a majorant (maximum density) bound. We use ratio tracking for shadow-ray transmittance.</li>
+  <li><strong>A procedural cloud.</strong> The density comes from fractal noise combined with a shaping function so it reads as a cumulus-like blob. We cap the number of bounces and measure the effect.</li>
+  <li><strong>A backlit cloud with a visible silver lining.</strong> We render it at several values of g to show the effect.</li>
+  <li><strong>A static god-ray scene.</strong> A bright area light behind a window with mullions or openings shines into a hazy room or a cloud. Window shapes can include a simple tinted pane that absorbs per color channel.</li>
+  <li><strong>A short animated density sequence.</strong> The noise field is evolved over time (for example by moving the sample position through the noise and warping it), rendered as a frame sequence and encoded as a short video.</li>
+</ol>
+<p><strong>Images and animations we will produce:</strong></p>
+<ul>
+  <li>Homogeneous medium test renders at several densities, and the transmittance validation plot</li>
+  <li>Phase function comparison images for several values of g (for example g = 0, 0.5, 0.8, 0.9, with the exact set decided later)</li>
+  <li>The backlit cloud (hero image) and a front-lit comparison</li>
+  <li>A static god-ray image and a variant with a colored pane</li>
+  <li>An animated cloud, with and without the light shafts (a few seconds)</li>
+</ul>
+<p><strong>How we will measure quality and performance:</strong></p>
+<ul>
+  <li><strong>Correctness:</strong> Compare transmittance through a homogeneous slab against exp(&minus;&sigma;<sub>t</sub>&middot;d). Compare heterogeneous transmittance against a numerically integrated optical depth along the ray. Run a white-furnace-style test (scattering albedo 1, uniform illumination) to check energy conservation.</li>
+  <li><strong>Convergence:</strong> Plot variance or RMSE against sample count, with a high-sample render as the reference. We will check that the error falls at roughly 1/&radic;N as expected for Monte Carlo.</li>
+  <li><strong>Performance:</strong> Plot render time against density-grid resolution and against the number of bounces. We state our target frame times only after we have measured the baseline, so we make no numeric promises yet.</li>
+  <li><strong>Visual comparison:</strong> Side-by-side renders at different g values and different scattering orders.</li>
+</ul>
+<p><strong>Questions we plan to answer:</strong></p>
+<ul>
+  <li>How much does forward scattering (g) contribute to the silver lining, and how does the effect depend on the number of scattering bounces?</li>
+  <li>How does delta tracking compare to fixed-step ray marching in noise and cost for the same image?</li>
+  <li>How does the density-grid resolution affect visual quality and render time?</li>
+  <li>How noisy are light shafts with and without volumetric next-event estimation, and what does it cost?</li>
+</ul>
+
+<h3>3.2 What we hope to deliver (aspirational)</h3>
+<p>These are riskier and only attempted once the baseline works.</p>
+<ul>
+  <li><strong>Spinning prism or stained-glass window with dispersion.</strong> The prism produces rainbow-colored shafts, and a rotating glass element animates the colored light. This needs refractive and glass BSDFs, which our HW3-1 code does not include, so we would write them first. Our estimators can also no longer connect shadow rays through refractive glass directly, so noise is a real risk. Direct connections work through apertures and tinted, non-refracting panes, but not through refractive glass.</li>
+  <li><strong>Spectral or per-wavelength rendering.</strong> Wavelength-dependent index of refraction and absorption. We plan to start with a few discrete wavelengths or per-RGB-channel absorption before attempting anything more.</li>
+  <li><strong>Multiple-scattering tricks</strong> to reduce cost, such as Russian roulette tuned for media, or a cheaper approximation for high-order scattering compared against our reference.</li>
+  <li><strong>A denoiser,</strong> for example a simple edge-aware filter on our noisy low-sample volume renders.</li>
+  <li><strong>An interactive preview</strong> at low resolution (for example a progressive viewer with adjustable g and density).</li>
+  <li><strong>A comparison against a reference renderer.</strong> For example, a matching scene in a renderer that supports volumes, if we have time to set one up.</li>
+</ul>
+
+<h2>4. Schedule</h2>
+<p>No late days are allowed on any part of the final project.</p>
+<table>
+  <thead><tr><th style="width:11%">Week</th><th style="width:20%">Dates</th><th>Tasks</th></tr></thead>
+  <tbody>
+    <tr><td>Proposal</td><td>Tue Nov 10 (due); Fri Nov 13 staff feedback</td><td>Submit proposal; incorporate staff feedback; set up repo and shared task list</td></tr>
+    <tr><td>1</td><td>Nov 10&ndash;16</td><td><ul>
+      <li>Medium interface and volume infrastructure in the HW3 code</li>
+      <li>Homogeneous medium: free-flight sampling, absorption and scattering</li>
+      <li>Transmittance tests against the analytic slab</li>
+      <li>Density-grid data structure and noise generator (Perlin/Worley), scene setup and test scenes</li></ul></td></tr>
+    <tr><td>2</td><td>Nov 17&ndash;22</td><td><ul>
+      <li>Heterogeneous density with delta tracking and majorant bound</li>
+      <li>HG phase function with importance sampling, and its statistical tests</li>
+      <li>Ratio-tracking shadow rays, convergence plots</li>
+      <li><strong>Graded Milestone due Sun Nov 22:</strong> report webpage, 1-minute video with every member speaking, 2&ndash;3 slides</li></ul></td></tr>
+    <tr><td>3</td><td>Nov 23&ndash;29</td><td><ul>
+      <li>Lighting setup, backlit cloud look, g comparisons</li>
+      <li>Window geometry, volumetric light sampling, god-ray scene, tinted pane</li>
+      <li>Time-varying density and the animation render script</li>
+      <li>Performance experiments (time vs. grid resolution, delta tracking vs. ray marching)</li>
+      <li>Thanksgiving is Thu Nov 26. We plan lighter work that week and start long renders before then.</li></ul></td></tr>
+    <tr><td>4</td><td>Nov 30&ndash;Dec 6</td><td><ul>
+      <li>Aspirational work (prism or stained glass, spectral absorption, denoiser) only if the baseline is complete</li>
+      <li>Final high-sample renders and animation frames; encode video</li>
+      <li>Final report webpage, plots, and the final video</li>
+      <li><strong>Final Report + Video due Sun Dec 6</strong></li></ul></td></tr>
+    <tr><td>Presentations</td><td>Mon Dec 7 and Tue Dec 8</td><td>5-minute presentation including a 1-minute demo</td></tr>
+  </tbody>
+</table>
+<p>We plan to finish all baseline renders by around Nov 29, so the last week is for polish and the report. We queue long renders early, since they are the main schedule risk.</p>
+
+<h2>5. Resources</h2>
+<p><strong>Platform.</strong> C++ on top of our CS 184 HW3 path tracer. We use the same build system and course framework. Animation frames are rendered as image sequences and encoded into video with standard tools.</p>
+<p><strong>Starting code.</strong> Our CS 184 Project 3-1 path tracer (GitHub repo <code>hw3-rb</code> in the course&rsquo;s <code>cal-cs184-student</code> organization).</p>
+<p><strong>Hardware.</strong> We assume CPU rendering with multithreading, and we budget render time accordingly. GPUs are optional and only relevant if we attempt the interactive preview.</p>
+<ul>
+  <li>Diego Vargas de Souza: B650 desktop, NVIDIA GeForce RTX 5070</li>
+  <li>Yuheng Wang: MacBook Pro M5</li>
+  <li>Ralfi Bahar: MacBook Pro M2</li>
+  <li>Diego Jiang: ROG Zephyrus, NVIDIA GeForce RTX 5080</li>
+</ul>
+<p><strong>Software.</strong> Our HW3 codebase, our own noise and grid code, and optionally OpenVDB for loading or storing density grids. We would only use OpenVDB if it does not slow us down.</p>
+
+<h3>References</h3>
+<div class="refs">
+<p>Volume Scattering (Chapter 11), PBR Book 4th edition, Pharr, Jakob, Humphreys<br><a href="https://pbr-book.org/4ed/Volume_Scattering">https://pbr-book.org/4ed/Volume_Scattering</a></p>
+<p>Phase Functions, PBR Book 4th edition (Henyey-Greenstein), Pharr, Jakob, Humphreys<br><a href="https://pbr-book.org/4ed/Volume_Scattering/Phase_Functions">https://pbr-book.org/4ed/Volume_Scattering/Phase_Functions</a></p>
+<p>Light Transport II: Volume Rendering (Chapter 14, includes null scattering), PBR Book 4th edition, Pharr, Jakob, Humphreys<br><a href="https://pbr-book.org/4ed/Light_Transport_II_Volume_Rendering">https://pbr-book.org/4ed/Light_Transport_II_Volume_Rendering</a></p>
+<p>Volume Scattering (Chapter 11), PBR Book 3rd edition, Pharr, Jakob, Humphreys<br><a href="https://pbr-book.org/3ed-2018/Volume_Scattering">https://pbr-book.org/3ed-2018/Volume_Scattering</a></p>
+<p>Monte Carlo Integration (Chapter 13), PBR Book 3rd edition, Pharr, Jakob, Humphreys<br><a href="https://pbr-book.org/3ed-2018/Monte_Carlo_Integration">https://pbr-book.org/3ed-2018/Monte_Carlo_Integration</a></p>
+<p>Efficient Monte Carlo Methods for Light Transport in Scattering Media (Chapter 4: Light Transport in Participating Media), PhD thesis, Wojciech Jarosz<br><a href="https://cs.dartmouth.edu/~wjarosz/publications/dissertation/chapter4.pdf">https://cs.dartmouth.edu/~wjarosz/publications/dissertation/chapter4.pdf</a></p>
+<p>Rendering Participating Media with Bidirectional Path Tracing, Eric P. Lafortune and Yves D. Willems, Eurographics Rendering Workshop 1996<br><a href="https://lafortune.eu/publications/Porto.html">https://lafortune.eu/publications/Porto.html</a></p>
+<p>Monte Carlo Methods for Volumetric Light Transport Simulation, Jan Novak, Iliyan Georgiev, Johannes Hanika, Wojciech Jarosz, Computer Graphics Forum 2018<br><a href="https://cs.dartmouth.edu/wjarosz/publications/novak18monte.html">https://cs.dartmouth.edu/wjarosz/publications/novak18monte.html</a></p>
+<p>Production Volume Rendering (SIGGRAPH 2017 course), Julian Fong, Magnus Wrenninge, Christopher Kulla, Ralf Habel<br><a href="https://graphics.pixar.com/library/ProductionVolumeRendering/paper.pdf">https://graphics.pixar.com/library/ProductionVolumeRendering/paper.pdf</a></p>
+<p>The Real-Time Volumetric Cloudscapes of Horizon Zero Dawn (SIGGRAPH 2015, the cloud-modeling approach behind &ldquo;Nubis&rdquo;-style clouds), Andrew Schneider<br><a href="https://www.guerrilla-games.com/read/the-real-time-volumetric-cloudscapes-of-horizon-zero-dawn">https://www.guerrilla-games.com/read/the-real-time-volumetric-cloudscapes-of-horizon-zero-dawn</a></p>
+<p>Improving Noise, Ken Perlin<br><a href="https://mrl.cs.nyu.edu/~perlin/paper445.pdf">https://mrl.cs.nyu.edu/~perlin/paper445.pdf</a></p>
+<p>A Cellular Texture Basis Function, Steven Worley, SIGGRAPH 1996<br><a href="https://doi.org/10.1145/237170.237267">https://doi.org/10.1145/237170.237267</a></p>
+<p>OpenVDB (optional, sparse volumetric grids)<br><a href="https://www.openvdb.org/">https://www.openvdb.org/</a></p>
+</div>
+
+</body>
+</html>
