@@ -1,0 +1,7 @@
+# Homogeneous fog for dae/sky/CBempty.dae (world coordinates).
+bounds_min -1 0 -1
+bounds_max 1 1.5 1
+density 1
+extinction_scale 0.65
+albedo 0.9
+seed 184
