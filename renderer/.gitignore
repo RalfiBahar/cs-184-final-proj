@@ -1,0 +1,13 @@
+.DS_Store
+build
+exr
+out
+.vs
+.vscode
+*.json
+Debug
+
+# Generated Part A renders and standalone test fixtures
+/renders/
+/test_medium.vol
+/test_bad.vol
