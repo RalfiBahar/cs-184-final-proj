@@ -1,0 +1,147 @@
+PART B HANDOFF: HG SCATTERING AND VOLUME LIGHTING
+Prepared November 21, 2026
+Base archive commit: 51ac558e9993aac18f2454bdc1981c1ee422f226
+Repository: https://github.com/RalfiBahar/cs-184-final-proj
+
+AUTHOR
+Yuheng Wang — Part B (HG scattering and volume lighting)
+Developed with AI assistance.
+
+STATUS
+Implemented against main commit 51ac558. The lighting helper is integrated
+in volume_integrator.cpp on this branch. The application retains its existing
+isotropic default; HG is selected through the existing public phase interface.
+Focused tests, Part A regression tests, analytic HG checks and synthetic fog
+renders passed on macOS. See experiments/part_b/ for measured results.
+
+FILES TO ADD (relative to renderer/)
+src/volume/hg_phase.h              HG PhaseFunction implementation
+src/volume/direct_lighting.h     extracted lighting estimator with Tr callback
+tests/phase_lighting_tests.cpp     focused statistical and lighting checks
+tests/part_b.cmake                optional CMake target for A to include
+scripts/test_part_b.sh            standalone macOS/Linux build and test
+scripts/plot_part_b.py            plot saved C++ measurements using reportlab
+experiments/part_b/               CSV measurements and validation figure
+
+EXACT TEST COMMANDS
+From the repository root on macOS:
+  bash renderer/scripts/test_part_b.sh
+For memory and undefined-behavior checks:
+  SANITIZE=1 BUILD_DIR=out/part-b-sanitized RESULT_DIR=experiments/part_b/sanitized bash renderer/scripts/test_part_b.sh
+Regenerate the SVG plot (Python with reportlab installed):
+  python3 renderer/scripts/plot_part_b.py
+The provided PNG is exported from the same SVG.
+
+For A's existing CMake/Windows environment, add this line at the end of
+renderer/CMakeLists.txt:
+  include(tests/part_b.cmake)
+Then rerun the team's existing CMake configure command and:
+  cmake --build <build-directory> --target phase_lighting_tests
+  ctest --test-dir <build-directory> -R phase_lighting_tests --output-on-failure
+The Windows/CMake route is provided for integration and has not been run here.
+The shell script's Linux branch has not been run here either.
+
+VERIFIED HERE
+Apple clang 17.0.0, arm64 macOS, C++14, -O2, one thread.
+Both normal and AddressSanitizer/UndefinedBehaviorSanitizer builds passed
+5,640,716 assertions. Most assertions are repeated per-sample invariants, not
+millions of distinct test cases. No sanitizer diagnostic occurred.
+
+HG: 200,000 samples for each g = -0.8, -0.5, -1e-9, 0, 1e-9, 0.5, 0.8.
+Seed 184. Incoming direction is normalize(1,2,3).
+ g       mean cosine       estimated standard error
+ 0       0.00161310        0.00129040
+ 0.5     0.50130405        0.00111717
+ 0.8     0.80060202        0.00077404
+Means passed a 5-standard-error acceptance test. Histograms use 80 bins and
+compare against independent numerical integration of the marginal 2*pi*p(mu).
+Additional checks cover PDF normalization, second moment (1+2*g*g)/3,
+azimuthal symmetry, unit directions, phase/PDF=1, deterministic seeds,
+invalid parameters, axial frames, and g close to +/-1. The extreme-g checks
+verify numerical finiteness, not full distribution accuracy at those extremes.
+
+Lighting: actual repository BVH, BBox, HomogeneousMedium, PointLight and
+AreaLight are compiled into the tests. BoxFixture is a deliberately simple
+opaque fixture primitive using the actual BBox intersection routine.
+UniformSphereFixture is test-only illumination, not production environment code.
+Tests cover opaque blockage, geometry behind the light, multiple-light sums,
+perpendicular illumination (no surface cosine), clipped analytic Tr=exp(-0.8),
+invalid callback results, and zero sample counts.
+The real 2x2 area light at distance 2 gives 0.06407935 versus the independent
+rectangle-solid-angle reference 0.06409422, with standard error 0.00002667.
+Uniform-radiance sphere estimates at g=0,0.5,0.8 pass 5-SE checks. This is a
+local direct-light integral test, not a full white-furnace render.
+
+INTEGRATION FOR DIEGO JIANG / A
+1. Include volume/hg_phase.h where the phase object is configured. Before
+   rendering, set:
+     tracer.phase = std::make_shared<Volume::HenyeyGreensteinPhase>(0.5);
+   The public phase member already exists. Keep g=0 as the comparison case.
+   If setting the constructor default temporarily, add the include to
+   pathtracer.cpp and replace its IsotropicPhase construction for the demo.
+   Do not imply that the current .vol parser accepts g: it does not. A should
+   add explicit configuration or choose the phase in the setup code.
+2. Existing A volume_direct_lighting already uses the virtual phase interface.
+   Therefore HG works with A's existing helper as soon as phase is selected.
+   There is no need to add a second direct-light contribution.
+3. To adopt B's extracted helper, include volume/direct_lighting.h in
+   volume_integrator.cpp and REPLACE the body of volume_direct_lighting with:
+     return Volume::direct_volume_lighting(position, incoming, *phase,
+         scene->lights, *bvh, ns_area_light, rng,
+         [this](const Ray& shadow, Volume::RNG& r) {
+           return medium_transmittance(shadow, r);
+         });
+   This preserves A's clipped-medium callback and D's virtual transmittance
+   integration point. The helper applies no albedo or throughput: A already
+   applies those at the event. Every light is sampled, so no extra selection
+   probability is required. Delta lights use one sample and their sample_L PDF.
+4. Preserve A's emitter policy: after a non-delta phase event, suppress the
+   directly hit emitter contribution already counted by next-event estimation.
+   Preserve camera/delta-surface emission and surface-shadow attenuation.
+   A's complete volume_tests suite now passes with the helper integration patch.
+5. Run A's existing volume_tests plus B's tests after integration. Then compare
+   g=0,0.5,0.8 at identical camera, light, density, samples, seed and depth.
+   Use one thread and disabled adaptive sampling for comparison. On Windows,
+   after each selected g is built, a suitable command from renderer/ is:
+     .\out\build\x64-Release\pathtracer.exe -s 64 -l 4 -t 1 -m 6 -a 0 0 -r 256 256 -c scenes/volume/cornell_demo.cam -v scenes/volume/cornell_fog.vol -f fog_g05.png scenes/volume/cornell_demo.dae
+   Change the output filename for each g. These renders have NOT been run here.
+
+HOW TO EXPLAIN THE MATH
+The phase function is a probability density over outgoing directions. HG's g
+is the expected cosine of the scattering angle: zero is isotropic, positive
+values favor continuing forward, negative values favor reversing direction.
+With traveling directions and mu=dot(incoming,outgoing):
+  p(mu) = (1-g^2) / [4*pi*(1+g^2-2*g*mu)^(3/2)].
+The sampler draws mu by the inverse CDF and phi uniformly, then rotates the
+sample around the incoming direction using an orthonormal frame. At g=0 it
+samples isotropically. Near zero it uses an algebraically equivalent inverse
+CDF that avoids cancellation; it does not silently set a nonzero g to zero.
+Sampling matches p, so value/pdf equals 1 for continuation.
+
+A histogram of mu measures density in one dimension, while p is per unit solid
+angle. Integrating out azimuth contributes 2*pi. That is why the plotted
+reference is 2*pi*p(mu), not p(mu).
+
+Direct lighting estimates Li * phase * Tr / lightPdf, then the caller multiplies
+by current throughput. There is no surface cosine at a volume point. Opaque
+visibility gives zero behind a blocker; Tr models attenuation only along the
+clipped medium segment. The inherited point-light sample_L convention returns
+its stored RGB value without inverse-square scaling; B preserves this API
+rather than changing A's scene calibration.
+
+LIMITATIONS
+The full application build requires CMake/Freetype and viewer dependencies.
+CMake was unavailable, so a headless integration build compiled the actual
+renderer sources directly. A regressions and synthetic fog g-comparison renders
+now pass. No full viewer launch, timing benchmark, Windows build, heterogeneous
+cloud render, or full white-furnace test is claimed.
+Parts C and D were not present in the supplied main snapshot. Their latest
+branches and local changes must be reconciled by the team. Existing advanced
+light/material stubs remain outside B's work. Build/test output is only local.
+
+REFERENCES
+Milestone Guide (1).pdf, Owner B section (PDF pages 14-18).
+Actual contract: renderer/docs/PART_A.md and renderer/src/volume/phase.h.
+PBRT 4e: https://pbr-book.org/4ed/Volume_Scattering/Phase_Functions
+PBRT uses both-away directions; this repository uses traveling directions,
+so the sign in its HG denominator must be translated.

@@ -1,0 +1,6 @@
+escape_probability,0.449307,analytic,0.449329,SE,0.00128435
+inside_surface,0.72734,analytic,0.726149,SE,0.00140826
+single_scattering,0.0200292,analytic,0.0200236,SE,4.51828e-05
+surface_shadow,0.0641864,analytic,0.0642657,SE,0.000205355
+PASS: 953738 checks (including Monte Carlo trials)
+PASS: 7068954 assertions including A regressions, integrated HG, and render sample validity
