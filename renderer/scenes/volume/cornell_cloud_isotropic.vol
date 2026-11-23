@@ -1,0 +1,9 @@
+# Same procedural cloud as cornell_cloud.vol, with isotropic scattering.
+bounds_min -1 0.1 -0.95
+bounds_max 1 1.7 0.95
+cloud_resolution 48
+density 1
+extinction_scale 5
+albedo 0.93
+phase_g 0
+seed 184

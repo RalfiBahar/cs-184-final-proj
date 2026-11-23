@@ -5,6 +5,7 @@
 #include "aggregate.h"
 
 #include <vector>
+#include <atomic>
 
 namespace CGL { namespace SceneObjects {
 
@@ -82,7 +83,7 @@ class BVHAccel : public Aggregate {
              false otherwise
    */
   bool has_intersection(const Ray& r) const {
-    ++total_rays;
+    total_rays.fetch_add(1, std::memory_order_relaxed);
     return has_intersection(r, root);
   }
 
@@ -102,7 +103,7 @@ class BVHAccel : public Aggregate {
              false otherwise
    */
   bool intersect(const Ray& r, Intersection* i) const {
-    ++total_rays;
+    total_rays.fetch_add(1, std::memory_order_relaxed);
     return intersect(r, i, root);
   }
 
@@ -133,7 +134,7 @@ class BVHAccel : public Aggregate {
   void drawOutline(const Color& c, float alpha) const { }
   void drawOutline(BVHNode *node, const Color& c, float alpha) const;
 
-  mutable unsigned long long total_rays, total_isects;
+  mutable std::atomic<unsigned long long> total_rays{0}, total_isects{0};
 
 private:
   std::vector<Primitive*> primitives;

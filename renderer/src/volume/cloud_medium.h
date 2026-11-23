@@ -2,6 +2,7 @@
 #define SILVER_LINING_CLOUD_MEDIUM_H
 
 #include "medium.h"
+#include "transmittance.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -37,6 +38,8 @@ class CloudMedium final : public Medium {
     }
     // Trilinear interpolation stays within the range of the corner samples.
     majorant = maximum * scale;
+    if (majorant > 0 && std::isfinite(majorant))
+      majorant = std::nextafter(majorant, std::numeric_limits<double>::infinity());
     if (!std::isfinite(majorant))
       throw std::invalid_argument("Cloud extinction majorant must be finite");
   }
@@ -93,14 +96,17 @@ class CloudMedium final : public Medium {
       t = next > t ? next : std::nextafter(t, segment.end);
       if (!(t < segment.end)) break;
       const Vector3D p = ray.at_time(t);
-      if (rng.uniform() < sigma_t(p) / majorant) return {true, t, p};
+      const double sigma = sigma_t(p);
+      if (!std::isfinite(sigma) || sigma < 0 || sigma > majorant)
+        throw std::runtime_error("Cloud extinction exceeds its majorant");
+      if (rng.uniform() < sigma / majorant) return {true, t, p};
     }
     return {};
   }
 
-  // Bernoulli escape estimator until Part D supplies ratio tracking.
+  // Part D attenuation-only estimator; callers handle opaque visibility.
   double transmittance(const Ray& ray, Interval segment, RNG& rng) const override {
-    return sample_collision(ray, segment, rng).occurred ? 0.0 : 1.0;
+    return ratio_tracking_transmittance(*this, ray, segment, rng);
   }
 
  private:

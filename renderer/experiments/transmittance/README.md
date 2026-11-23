@@ -60,8 +60,8 @@ right-hand z-score panel is the more informative view.
 ## Limits
 
 - Scalar (non-spectral) extinction only; per-channel extinction is future work.
-- Fixtures are hand-built; ratio tracking is not yet exercised through the
-  integrated renderer or on `CloudMedium`.
+- The evaluation fixtures are hand-built. The combined CMake tests additionally exercise
+  ratio tracking through `CloudMedium` and the actual surface/volume integrator.
 - Timings are single-thread microbenchmarks of the estimators on one machine,
   not render times (see `results/run_info.txt` for the machine and commit).
 - This module does not do opaque-surface visibility; that stays with the lighting helper.

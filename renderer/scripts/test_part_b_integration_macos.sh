@@ -12,7 +12,7 @@ clang++ -std=c++14 -O2 -Wno-deprecated-declarations -Wl,-dead_strip \
  src/pathtracer/camera.cpp src/pathtracer/camera_lens.cpp \
  src/scene/bbox.cpp src/scene/bvh.cpp src/scene/object.cpp src/scene/sphere.cpp \
  src/scene/triangle.cpp src/scene/light.cpp src/scene/environment_light.cpp \
- src/volume/medium.cpp src/util/lodepng.cpp src/util/sphere_drawing.cpp src/application/visual_debugger.cpp src/imgui/imgui.cpp src/imgui/imgui_draw.cpp src/imgui/imgui_tables.cpp src/imgui/imgui_widgets.cpp \
+ src/volume/medium.cpp src/volume/transmittance.cpp src/util/lodepng.cpp src/util/sphere_drawing.cpp src/application/visual_debugger.cpp src/imgui/imgui.cpp src/imgui/imgui_draw.cpp src/imgui/imgui_tables.cpp src/imgui/imgui_widgets.cpp \
  CGL/src/vector2D.cpp CGL/src/vector3D.cpp CGL/src/vector4D.cpp \
  CGL/src/matrix3x3.cpp CGL/src/matrix4x4.cpp CGL/src/color.cpp \
  -framework OpenGL -o out/verify-integration/part_b_integration_tests

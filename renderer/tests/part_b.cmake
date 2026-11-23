@@ -1,4 +1,4 @@
-# Optional integration by A: include(tests/part_b.cmake) at the end of renderer/CMakeLists.txt.
+# Included by BUILD_VOLUME_TESTS; uses the same compiler flags and vector ABI.
 add_executable(phase_lighting_tests tests/phase_lighting_tests.cpp src/pathtracer/sampler.cpp)
 target_link_libraries(phase_lighting_tests PRIVATE pt31)
 enable_testing()

@@ -6,4 +6,5 @@ cloud_resolution 48
 density 1
 extinction_scale 5
 albedo 0.93
+phase_g 0.5
 seed 184

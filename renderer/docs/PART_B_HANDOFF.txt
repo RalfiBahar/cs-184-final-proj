@@ -1,3 +1,5 @@
+HISTORICAL HANDOFF: Subsequent integration now supports phase_g in sidecars, normal CMake tests, and cloud ratio-tracked shadows. See docs/INTEGRATION.md for current behavior.
+
 PART B HANDOFF: HG SCATTERING AND VOLUME LIGHTING
 Prepared November 21, 2026
 Base archive commit: 51ac558e9993aac18f2454bdc1981c1ee422f226

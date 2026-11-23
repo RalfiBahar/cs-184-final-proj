@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Silver Lining: CS184 milestone report on our integrated volumetric path tracer, preliminary renders, validation, and next steps.">
+  <title>Silver Lining | Milestone Report</title>
+  <link rel="canonical" href="https://ralfibahar.github.io/cs-184-final-proj/milestone.html">
+  <style>
+    :root { color-scheme: light; --ink:#14243a; --muted:#45586b; --accent:#10675f; --rule:#d7e1e5; }
+    * { box-sizing:border-box; }
+    html { background:#edf2f5; }
+    body { margin:0; color:var(--ink); font:16px/1.48 Arial, Helvetica, sans-serif; }
+    main { max-width:1000px; margin:36px auto; padding:40px 48px 30px; background:#fff; box-shadow:0 10px 42px #14243a0d; }
+    .eyebrow { margin:0 0 8px; color:var(--accent); font-size:14px; font-weight:700; letter-spacing:.13em; text-transform:uppercase; }
+    h1 { margin:0; font-size:48px; line-height:1.08; letter-spacing:-.045em; }
+    .subtitle { margin:8px 0 13px; font-size:21px; color:var(--muted); }
+    .team { margin:0; font-size:14px; color:var(--muted); }
+    nav { display:flex; gap:10px; flex-wrap:wrap; margin:20px 0 22px; }
+    a { color:var(--accent); text-underline-offset:3px; }
+    a:hover { color:#073e39; }
+    a:focus-visible { outline:3px solid #148678; outline-offset:4px; }
+    nav a { padding:7px 13px; background:#edf7f4; border:1px solid #c9e4dc; border-radius:5px; font-weight:700; text-decoration:none; }
+    section { margin-top:20px; }
+    h2 { margin:0 0 8px; padding-top:12px; border-top:1px solid var(--rule); font-size:19px; line-height:1.25; letter-spacing:-.015em; }
+    p { margin:0 0 9px; }
+    .contributions { margin:0; padding-left:20px; }
+    .contributions li { padding-left:2px; margin:3px 0; }
+    .gallery { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:10px; }
+    figure { margin:0; min-width:0; }
+    figure img { display:block; width:100%; height:auto; aspect-ratio:1; background:#0d1119; image-rendering:auto; }
+    figcaption { margin-top:7px; font-size:14px; line-height:1.35; color:var(--muted); }
+    figcaption strong { display:block; color:var(--ink); margin-bottom:2px; }
+    .settings { font-size:13px; color:var(--muted); margin-top:9px; }
+    .columns { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
+    .plan { margin:0; padding-left:20px; }
+    .plan li { padding-left:2px; margin:4px 0; }
+    footer { margin-top:18px; padding-top:10px; border-top:1px solid var(--rule); font-size:13px; color:var(--muted); }
+    footer p { margin:0 0 5px; }
+    footer a { overflow-wrap:anywhere; }
+    @media (max-width:640px) {
+      html { background:#fff; }
+      main { margin:0; padding:28px 20px; box-shadow:none; }
+      h1 { font-size:40px; }
+      .subtitle { font-size:19px; }
+      .gallery { gap:10px; }
+      .columns { grid-template-columns:1fr; gap:0; }
+    }
+    @media (max-width:400px) {
+      .gallery { grid-template-columns:1fr; gap:18px; }
+      figure { max-width:320px; margin:auto; }
+    }
+    @page { size:letter; margin:.5in .55in; }
+    @media print {
+      html, body { background:#fff; }
+      body { font-size:10pt; line-height:1.3; }
+      main { max-width:none; margin:0; padding:0; box-shadow:none; }
+      .eyebrow { font-size:8.5pt; margin-bottom:5pt; }
+      h1 { font-size:30pt; }
+      .subtitle { font-size:13pt; margin:5pt 0 7pt; }
+      .team { font-size:9pt; }
+      nav { margin:10pt 0 12pt; gap:14pt; }
+      nav a { padding:0; background:none; border:0; border-radius:0; text-decoration:underline; font-size:10pt; }
+      section { margin-top:11pt; }
+      h2 { font-size:12pt; padding-top:7pt; margin-bottom:5pt; break-after:avoid; }
+      p { margin-bottom:5pt; }
+      .contributions li { margin:2pt 0; }
+      .gallery { gap:11pt; margin-top:6pt; grid-template-columns:repeat(3,minmax(0,1fr)); }
+      figure { max-width:none; margin:0; break-inside:avoid; }
+      figure img { width:100%; max-width:1.9in; margin:0 auto; }
+      figcaption { font-size:8.5pt; margin-top:4pt; line-height:1.25; }
+      .settings { font-size:8pt; margin-top:5pt; }
+      .columns { grid-template-columns:1fr 1fr; gap:16pt; }
+      .plan li { margin:2pt 0; }
+      footer { margin-top:10pt; padding-top:6pt; font-size:8pt; }
+      a { color:#145b55; }
+      .pdf-download { display:none; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">CS184 Final Project · Milestone · November 22, 2026</p>
+    <h1>Silver Lining</h1>
+    <p class="subtitle">A volumetric cloud and god-ray renderer</p>
+    <p class="team">Diego Jiang · Ralfi Bahar · Yuheng Wang · Diego Vargas de Souza</p>
+    <nav aria-label="Milestone deliverables">
+      <a href="https://docs.google.com/presentation/d/1KhX_DFcfQ-dD9mR8cU16NUxMCfijkWFctBPT4PaKddc/edit?usp=sharing">Presentation slides</a>
+      <a href="https://drive.google.com/file/d/1TMFOAsnnHbweFWimNGZ1O27FPfUmUnc4/view?usp=sharing">Milestone video</a>
+      <a href="https://github.com/RalfiBahar/cs-184-final-proj">Source code</a>
+      <a class="pdf-download" href="milestone.pdf" download>Printable PDF</a>
+    </nav>
+  </header>
+
+  <section aria-labelledby="accomplishments">
+    <h2 id="accomplishments">What we have accomplished</h2>
+    <p>We extended our HW3 surface path tracer into an integrated CPU renderer for participating media. Light can now be absorbed and scattered inside a bounded volume, while surfaces and opaque shadows remain part of the same path.</p>
+    <ul class="contributions">
+      <li><strong>Medium foundation:</strong> homogeneous fog, scene settings, surface/volume path integration, and regression tests.</li>
+      <li><strong>Scattering and lighting:</strong> configurable Henyey–Greenstein (HG) scattering and direct volume illumination.</li>
+      <li><strong>Cloud density:</strong> seeded procedural noise on a 48 × 48 × 48 grid, interpolation, and delta-tracked collisions.</li>
+      <li><strong>Shadow attenuation:</strong> analytic homogeneous transmittance and ratio tracking for heterogeneous clouds.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="results">
+    <h2 id="results">Preliminary results</h2>
+    <div class="gallery">
+      <figure>
+        <img src="images/milestone/baseline.png" width="128" height="128" alt="Surface-only Cornell box with red and blue walls and an overhead light.">
+        <figcaption><strong>Surface baseline</strong>Original scene without a participating medium.</figcaption>
+      </figure>
+      <figure>
+        <img src="images/milestone/homogeneous-fog.png" width="128" height="128" alt="The Cornell box filled with uniform fog, showing absorption and scattering.">
+        <figcaption><strong>Homogeneous fog</strong>Absorption and isotropic scattering in a uniform medium.</figcaption>
+      </figure>
+      <figure>
+        <img src="images/milestone/cloud-hg.png" width="128" height="128" alt="Cornell box rendered with a spatially varying procedural cloud and HG scattering.">
+        <figcaption><strong>Integrated cloud</strong>Varying density, HG g = 0.5, and ratio-tracked shadows.</figcaption>
+      </figure>
+    </div>
+    <p class="settings">Our renders: same scene and camera; 128 × 128 pixels, 64 samples/pixel, depth 6, one thread. Medium settings differ; these are preliminary previews, not a noise-controlled convergence study.</p>
+    <p><strong>Validation:</strong> all six test suites pass in Release and RelWithDebInfo builds, including parallel execution. Combined cloud/HG/ratio-tracking single-scattering estimates agree with analytic references within five standard errors at g = 0, 0.5, and 0.8. Additional checks cover vacuum, clipping, blockers, and emitter handling; repeated single-thread cloud renders produce identical PNGs.</p>
+  </section>
+
+  <div class="columns">
+    <section aria-labelledby="progress">
+      <h2 id="progress">Progress relative to our plan</h2>
+      <p>The core transport modules are now connected. Integration required explicit phase configuration, shared shadow attenuation, and consistent test/build settings. Our proposal’s visual goals—clear silver lining and window light shafts—are not demonstrated yet; this milestone establishes the tested foundation.</p>
+    </section>
+    <section aria-labelledby="next">
+      <h2 id="next">Updated work plan</h2>
+      <ol class="plan">
+        <li>Build a backlit cloud scene to demonstrate forward scattering and silver lining.</li>
+        <li>Compare noise and runtime across sample counts and phase settings using fixed scenes and seeds.</li>
+        <li>Add window light shafts; pursue animation after the static scenes are stable.</li>
+      </ol>
+    </section>
+  </div>
+
+  <footer>
+    <p><strong>Current scope:</strong> one bounded volume, scalar extinction/albedo, CPU rendering. The integrated build is verified on Windows; overlapping media and colored extinction remain future work.</p>
+    <p>Persistent report: <a href="https://ralfibahar.github.io/cs-184-final-proj/milestone.html">ralfibahar.github.io/cs-184-final-proj/milestone.html</a></p>
+  </footer>
+</main>
+</body>
+</html>

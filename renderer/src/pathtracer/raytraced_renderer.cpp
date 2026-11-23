@@ -678,9 +678,11 @@ void RaytracedRenderer::worker_thread() {
   if (continueRaytracing && workerDoneCount == numWorkerThreads) {
     timer.stop();
     fprintf(stdout, "\r[PathTracer] Rendering... 100%%! (%.4fs)\n", timer.duration());
-    fprintf(stdout, "[PathTracer] BVH traced %llu rays.\n", bvh->total_rays);
-    fprintf(stdout, "[PathTracer] Average speed %.4f million rays per second.\n", (double)bvh->total_rays / timer.duration() * 1e-6);
-    fprintf(stdout, "[PathTracer] Averaged %f intersection tests per ray.\n", (((double)bvh->total_isects)/bvh->total_rays));
+    const auto traced_rays = bvh->total_rays.load(std::memory_order_relaxed);
+    const auto intersection_tests = bvh->total_isects.load(std::memory_order_relaxed);
+    fprintf(stdout, "[PathTracer] BVH traced %llu rays.\n", traced_rays);
+    fprintf(stdout, "[PathTracer] Average speed %.4f million rays per second.\n", timer.duration() > 0 ? double(traced_rays) / timer.duration() * 1e-6 : 0.0);
+    fprintf(stdout, "[PathTracer] Averaged %f intersection tests per ray.\n", traced_rays ? double(intersection_tests) / traced_rays : 0.0);
 
     lock_guard<std::mutex> lk(m_done);
     state = DONE;

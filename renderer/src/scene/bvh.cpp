@@ -107,7 +107,7 @@ bool BVHAccel::has_intersection(const Ray &ray, BVHNode *node) const {
 
     if (node->isLeaf()) {
         for (auto p = node->start; p != node->end; ++p) {
-            total_isects++;
+            total_isects.fetch_add(1, std::memory_order_relaxed);
             if ((*p)->has_intersection(ray)) return true;
         }
         return false;
@@ -129,7 +129,7 @@ bool BVHAccel::intersect(const Ray &ray, Intersection *i, BVHNode *node) const {
     if (node->isLeaf()) {
         bool hit = false;
         for (auto p = node->start; p != node->end; ++p) {
-            total_isects++;
+            total_isects.fetch_add(1, std::memory_order_relaxed);
             if ((*p)->intersect(ray, i)) hit = true;
         }
         return hit;

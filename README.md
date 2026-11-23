@@ -1,48 +1,23 @@
 # Silver Lining — Volumetric Renderer
 
-A C++ path tracer for our CS184 final project. This repository extends our HW3 renderer with participating media.
+A C++ CS184 final project extending our HW3 path tracer with participating media.
 
-## Current Progress: Part A
+## Integrated features
 
-Implemented:
+| Part | Implementation |
+|---|---|
+| A | Bounded media, homogeneous absorption/scattering, mixed surface/volume paths, scene configuration |
+| B | Henyey–Greenstein phase evaluation/sampling and direct volume lighting |
+| C | Seeded procedural density grids, trilinear interpolation, majorants and delta-tracked collisions |
+| D | Analytic homogeneous attenuation and ratio-tracked heterogeneous shadow attenuation |
 
-- Bounded homogeneous fog with vacuum outside the volume
-- Density, extinction, and scattering albedo configuration
-- Exponential free-flight collision sampling
-- Isotropic scattering
-- Mixed surface and volume path tracing
-- Direct lighting with medium attenuation and opaque shadowing
-- Analytic homogeneous transmittance
-- Configurable volume sidecars through the `-v` option
-- Automated correctness and integration tests
+The application selects the configured medium and phase. Cloud shadow connections use ratio tracking;
+opaque visibility is checked separately. Surface and volume direct lighting share medium attenuation.
+Omitting `-v` preserves the surface-only renderer.
 
-The original surface-only renderer remains available by omitting `-v`.
+## Build and test
 
-## Repository Structure
-
-```text
-renderer/
-├── CGL/                         # Supporting graphics library and dependencies
-├── dae/                         # Existing scenes
-├── scenes/volume/               # Part A demo scene, camera, and medium settings
-├── scripts/render_part_a.ps1    # Repeatable demo renders
-├── src/
-│   ├── pathtracer/
-│   │   └── volume_integrator.cpp # Main volume rendering loop
-│   └── volume/
-│       ├── medium.h             # Shared medium interface
-│       ├── medium.cpp           # Homogeneous medium and configuration parser
-│       └── phase.h              # Phase interface and isotropic implementation
-├── tests/volume_tests.cpp       # Correctness and integration tests
-└── docs/
-    ├── PART_A.md                # Implementation details and team interfaces
-    └── PART_A_VERIFICATION.md   # Verification results and limitations
-```
-
-## Build
-
-The implementation was verified on Windows with Visual Studio 2026, MSVC, CMake, Ninja, and dependencies supplied through vcpkg.
-
+Verified toolchain: Windows, Visual Studio 2026/MSVC, CMake, Ninja, and vcpkg dependencies.
 From a Visual Studio developer terminal at the repository root:
 
 ```powershell
@@ -50,119 +25,69 @@ cmake -S renderer -B renderer/out/build/x64-Release -G Ninja `
   -DCMAKE_BUILD_TYPE=RelWithDebInfo `
   -DCMAKE_TOOLCHAIN_FILE="C:/path/to/vcpkg/scripts/buildsystems/vcpkg.cmake" `
   -DBUILD_VOLUME_TESTS=ON
-
 cmake --build renderer/out/build/x64-Release --parallel 6
-```
-
-Replace the vcpkg path with your local installation. The build requires OpenGL, Freetype, and the dependencies specified in the CMake files.
-
-## Run the Demo
-
-From the repository root:
-
-```powershell
-.\renderer\scripts\render_part_a.ps1 -Mode fog -Samples 64 -Size 128
-```
-
-Available modes:
-
-| Mode | Description |
-|------|-------------|
-| `baseline` | Original surface-only rendering |
-| `vacuum` | Volume integrator with zero density |
-| `absorption` | Homogeneous absorption without scattering |
-| `fog` | Homogeneous scattering and absorption |
-
-Generated images are saved to:
-
-```text
-renderer/renders/part-a/
-```
-
-To launch the interactive viewer, run from the `renderer` directory:
-
-```powershell
-.\out\build\x64-Release\pathtracer.exe `
-  -s 64 -l 4 -t 1 -m 6 `
-  -c scenes/volume/cornell_demo.cam `
-  -v scenes/volume/cornell_fog.vol `
-  scenes/volume/cornell_demo.dae
-```
-
-Press **R** to render the participating medium.
-
-## Medium Configuration
-
-Example `.vol` file:
-
-```text
-bounds_min -1 0 -1
-bounds_max 1 1.5 1
-density 1
-extinction_scale 0.65
-albedo 0.9
-seed 184
-```
-
-- Bounds use the renderer’s internal world coordinates.
-- Total extinction is `density × extinction_scale`.
-- Albedo is the fraction of extinction assigned to scattering, between `0` and `1`.
-- Zero density produces vacuum.
-- Invalid, missing, duplicate, or unknown settings are rejected.
-
-The volume boundary is a mathematical region, not an opaque surface.
-
-## Tests and Verification
-
-Run:
-
-```powershell
 ctest --test-dir renderer/out/build/x64-Release --output-on-failure
 ```
 
-Release and RelWithDebInfo builds passed locally. The test executable passed **953,738 checks**, including repeated Monte Carlo trials.
+Replace the vcpkg path. OpenGL and Freetype are required; CGL/GLFW/GLEW/ImGui are bundled.
+`BUILD_VOLUME_TESTS=ON` registers Part A regressions, B phase/lighting and integrator tests,
+combined A/B/C/D tests, and D's evaluation with two seeds.
 
-Coverage includes:
+## Render comparisons
 
-- Volume bounds and nearest-surface clipping
-- Cameras inside and outside the medium
-- Vacuum and analytic absorption
-- Free-flight collision statistics
-- Isotropic phase sampling
-- Analytic single scattering
-- Surface and volume shadow attenuation
-- Opaque blockers
-- Area-light sampling against a rectangle solid-angle reference
-- Emitter visibility and duplicate-contribution suppression
-- Path-depth behavior
-- Invalid configuration handling
+```powershell
+./renderer/scripts/render_integrated.ps1 -Samples 64 -Size 128
+```
 
-Render checks covered baseline, vacuum, absorption, fog, an inside-camera view, and a four-thread render. Repeated single-thread fog renders produced identical PNG hashes.
+This renders baseline, vacuum, absorption, homogeneous fog, isotropic cloud and HG cloud
+using one camera and common settings. Outputs are under `renderer/renders/integrated/`.
+Pass `-Executable` to use a different build or `-Threads 4` for a multithreaded smoke render.
+Use one thread for repeatable comparisons; legacy light/BSDF streams can depend on scheduling.
 
-These are focused Part A checks, not an exhaustive validation of the entire inherited renderer.
+## Volume settings
 
-## Team Integration
+```text
+bounds_min -1 0.1 -0.95
+bounds_max 1 1.7 0.95
+cloud_resolution 48
+density 1
+extinction_scale 5
+albedo 0.93
+phase_g 0.5
+seed 184
+```
 
-Part A provides the shared medium foundation and rendering interfaces.
+- Omit `cloud_resolution` for a homogeneous medium; include it for a procedural cloud.
+- `phase_g` must be strictly between -1 and 1. It defaults to 0 (isotropic); positive values favor forward scattering.
+- Extinction is density times extinction scale. Albedo is the scattering fraction in [0,1].
+- Bounds use internal world coordinates. The volume boundary is not opaque geometry.
+- Unknown, duplicate, malformed and invalid settings are rejected.
+- `scenes/volume/cornell_cloud.vol` and `cornell_cloud_isotropic.vol` differ only in phase anisotropy.
 
-Remaining integration work includes:
+To open the viewer, run from `renderer`:
 
-- **B:** Henyey–Greenstein phase function and lighting contributions
-- **C:** Heterogeneous density grids and delta tracking
-- **D:** Ratio-tracked transmittance and evaluation tooling
+```powershell
+./out/build/x64-Release/pathtracer.exe -s 64 -l 4 -t 1 -m 6 `
+  -c scenes/volume/cornell_demo.cam -v scenes/volume/cornell_cloud.vol `
+  scenes/volume/cornell_demo.dae
+```
 
-See `renderer/docs/PART_A.md` for interface conventions, ownership boundaries, and integration details.
+Press **R** to render. Add `-f cloud.png` for a file render.
 
-## Limitations
+## Code map
 
-The current implementation supports one bounded, nonemissive homogeneous medium with scalar extinction and albedo.
+- `renderer/src/pathtracer/volume_integrator.cpp`: mixed radiance loop and surface-shadow attenuation.
+- `renderer/src/volume/medium.h/.cpp`: shared contract and sidecar parser.
+- `renderer/src/volume/hg_phase.h`: HG scattering.
+- `renderer/src/volume/direct_lighting.h`: volume lighting and opaque visibility.
+- `renderer/src/volume/cloud_medium.h`: procedural grid, interpolation, delta tracking and ratio-shadow dispatch.
+- `renderer/src/volume/transmittance.h/.cpp`: attenuation estimators and reference quadrature.
+- `renderer/tests/combined_volume_tests.cpp`: tests spanning all four modules.
+- `renderer/docs/INTEGRATION.md`: integration changes, tests and limitations.
 
-Not yet implemented:
+## Scope
 
-- HG anisotropy
-- Heterogeneous clouds and delta tracking
-- Ratio tracking
-- Overlapping or nested media
-- Colored extinction, animation, or GPU acceleration
-
-Some inherited advanced materials, environment lighting, and light types remain incomplete. Current validation targets the diffuse/emissive Part A baseline. No full white-furnace validation or race-detector pass is claimed.
+One bounded, nonemissive volume with scalar extinction/albedo; CPU rendering only.
+Overlapping media, spectral extinction, animated clouds and polished god-ray scenes remain future work.
+Unfinished inherited advanced materials/light types are outside the tested diffuse/emissive baseline.
+A passing test suite is evidence for its fixtures, not exhaustive physical or race-detector validation.

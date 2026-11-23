@@ -74,6 +74,11 @@ namespace CGL {
         std::shared_ptr<const Volume::Medium> medium;
         std::shared_ptr<const Volume::PhaseFunction> phase;
         uint64_t volume_seed = 184;
+        void set_volume(const Volume::Settings& settings) {
+            medium = settings.medium;
+            phase = settings.phase ? settings.phase : std::make_shared<Volume::IsotropicPhase>();
+            volume_seed = settings.seed;
+        }
         Vector3D est_radiance_volume(const Ray& ray, Volume::RNG& rng);
         double medium_transmittance(const Ray& shadow, Volume::RNG& rng) const;
         Vector3D volume_direct_lighting(const Vector3D& position,

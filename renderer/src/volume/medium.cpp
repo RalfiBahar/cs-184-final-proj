@@ -1,5 +1,6 @@
 #include "medium.h"
 #include "cloud_medium.h"
+#include "hg_phase.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -98,6 +99,7 @@ Settings load_settings(const std::string& filename) {
       valid = bool(line >> cloud_resolution) && cloud_resolution >= 3 && cloud_resolution <= 256;
     else if (key == "extinction_scale") valid = bool(line >> scale);
     else if (key == "albedo") valid = bool(line >> albedo);
+    else if (key == "phase_g") valid = bool(line >> result.phase_g);
     else if (key == "seed") {
       std::string seed;
       if (line >> seed) {
@@ -111,6 +113,12 @@ Settings load_settings(const std::string& filename) {
   }
   for (const auto& required : {"bounds_min", "bounds_max", "extinction_scale", "albedo"})
     if (!seen.count(required)) throw std::runtime_error(filename + ": Missing key " + required);
+  if (!std::isfinite(result.phase_g) || std::abs(result.phase_g) >= 1.0)
+    throw std::runtime_error(filename + ": phase_g must be finite and strictly between -1 and 1");
+  if (result.phase_g == 0.0)
+    result.phase = std::make_shared<IsotropicPhase>();
+  else
+    result.phase = std::make_shared<HenyeyGreensteinPhase>(result.phase_g);
   const BBox bounds(lo, hi);
   if (cloud_resolution) {
     if (!std::isfinite(density) || density < 0 || !std::isfinite(scale) || scale < 0)

@@ -15,7 +15,7 @@ else
 fi
 "${CXX:-c++}" "${flags[@]}" -I src -I CGL/include -I CGL/include/CGL -I CGL/deps/glew/include \
   tests/phase_lighting_tests.cpp src/scene/bvh.cpp src/scene/bbox.cpp \
-  src/scene/light.cpp src/pathtracer/sampler.cpp src/volume/medium.cpp \
+  src/scene/light.cpp src/pathtracer/sampler.cpp src/volume/medium.cpp src/volume/transmittance.cpp \
   CGL/src/vector3D.cpp CGL/src/matrix3x3.cpp "${platform[@]}" \
   -o "$build_dir/phase_lighting_tests"
 "$build_dir/phase_lighting_tests" "$result_dir"

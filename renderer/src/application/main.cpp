@@ -37,7 +37,7 @@ void usage(const char *binaryName) {
          "mode\n");
   printf(
       "  -r  <INT> <INT>  Width and height of output image (if windowless)\n");
-  printf("  -v  <PATH>       Homogeneous medium sidecar (omit for HW3 mode)\n");
+  printf("  -v  <PATH>       Volume sidecar; optional phase_g and cloud_resolution (omit for HW3 mode)\n");
   printf("  -h               Print this help message\n");
   printf("\n");
 }
@@ -212,7 +212,8 @@ int main(int argc, char **argv) {
       std::cerr << "[Volume] NEE requires at least one light sample (-l 1 or higher)." << std::endl;
       return EXIT_FAILURE;
     }
-    msg("Homogeneous volume enabled; isotropic phase; seed=" << config.volume_settings.seed);
+    msg("Volume enabled; phase_g=" << config.volume_settings.phase_g
+        << "; seed=" << config.volume_settings.seed);
   }
   msg("Input scene file: " << sceneFilePath);
   string sceneFile = sceneFilePath.substr(sceneFilePath.find_last_of('/') + 1);

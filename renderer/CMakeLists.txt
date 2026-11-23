@@ -45,6 +45,7 @@ set(APPLICATION_3_1_SOURCE
     src/pathtracer/pathtracer.cpp
     src/pathtracer/volume_integrator.cpp
     src/volume/medium.cpp
+    src/volume/transmittance.cpp
 
     # Imgui
     src/imgui/imgui.cpp
@@ -204,14 +205,42 @@ endif()
 # Install settings
 set(CMAKE_INSTALL_PREFIX "${Assignment1_SOURCE_DIR}/")
 
-# Focused Part A tests use the same renderer support objects as the application.
-option(BUILD_VOLUME_TESTS "Build Part A correctness and integration tests" OFF)
+# All volume modules share the application's support code and compiler flags.
+option(BUILD_VOLUME_TESTS "Build A/B/C/D correctness and integration tests" OFF)
 if(BUILD_VOLUME_TESTS)
   enable_testing()
   set(VOLUME_TEST_SUPPORT ${APPLICATION_3_2_SOURCE})
   list(REMOVE_ITEM VOLUME_TEST_SUPPORT src/application/main.cpp)
-  add_executable(volume_tests tests/volume_tests.cpp ${VOLUME_TEST_SUPPORT})
-  target_include_directories(volume_tests PRIVATE src ${CGL_INCLUDE_DIRS})
-  target_link_libraries(volume_tests PRIVATE pt31)
+  add_library(volume_test_support OBJECT ${VOLUME_TEST_SUPPORT})
+  target_include_directories(volume_test_support PRIVATE src ${CGL_INCLUDE_DIRS})
+  function(add_volume_test target source)
+    add_executable(${target} ${source} $<TARGET_OBJECTS:volume_test_support>)
+    target_include_directories(${target} PRIVATE src ${CGL_INCLUDE_DIRS})
+    target_link_libraries(${target} PRIVATE pt31)
+  endfunction()
+  add_volume_test(volume_tests tests/volume_tests.cpp)
   add_test(NAME volume_tests COMMAND volume_tests)
+  include(tests/part_b.cmake)
+  add_volume_test(part_b_integration_tests tests/part_b_integration_tests.cpp)
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/test-results/part-b-integration")
+  add_test(NAME part_b_integration_tests COMMAND part_b_integration_tests
+           "${CMAKE_CURRENT_BINARY_DIR}/test-results/part-b-integration")
+  add_volume_test(combined_volume_tests tests/combined_volume_tests.cpp)
+  add_test(NAME combined_volume_tests COMMAND combined_volume_tests)
+  # A and B's integration suite create identically named temporary sidecars.
+  # Isolate working directories so ctest --parallel cannot race on those files.
+  foreach(test volume_tests phase_lighting_tests part_b_integration_tests combined_volume_tests)
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/test-work/${test}")
+    set_tests_properties(${test} PROPERTIES
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/test-work/${test}")
+  endforeach()
+  add_executable(transmittance_tests experiments/transmittance/eval_transmittance.cpp
+                 src/volume/medium.cpp src/volume/transmittance.cpp)
+  target_include_directories(transmittance_tests PRIVATE src ${CGL_INCLUDE_DIRS})
+  set_property(TARGET transmittance_tests PROPERTY CXX_STANDARD 17)
+  foreach(seed 184 2026)
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/test-results/transmittance-${seed}")
+    add_test(NAME transmittance_${seed} COMMAND transmittance_tests
+             "${CMAKE_CURRENT_BINARY_DIR}/test-results/transmittance-${seed}" 200000 ${seed})
+  endforeach()
 endif()

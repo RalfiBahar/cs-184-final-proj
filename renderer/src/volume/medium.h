@@ -9,6 +9,8 @@
 
 namespace CGL { namespace Volume {
 
+class PhaseFunction;
+
 // One RNG per camera path; no shared mutable engine in volume modules.
 class RNG {
  public:
@@ -70,6 +72,8 @@ class HomogeneousMedium final : public Medium {
 // Strict text sidecar used with -v <file>. Omit -v for unchanged HW3 mode.
 struct Settings {
   std::shared_ptr<const Medium> medium;
+  std::shared_ptr<const PhaseFunction> phase;
+  double phase_g = 0.0;
   uint64_t seed = 184;
 };
 Settings load_settings(const std::string& filename);

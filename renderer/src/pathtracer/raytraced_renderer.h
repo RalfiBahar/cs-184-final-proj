@@ -93,8 +93,7 @@ public:
 
   // Configure once before rendering; retain through pt->clear()/re-renders.
   void set_volume(const Volume::Settings& settings) {
-    pt->medium = settings.medium;
-    pt->volume_seed = settings.seed;
+    pt->set_volume(settings);
   }
 
   /**

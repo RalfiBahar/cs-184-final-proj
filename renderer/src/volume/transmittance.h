@@ -18,7 +18,8 @@ struct TransmittanceStats {
   uint64_t candidates = 0;  // majorant candidates generated (Poisson process)
 };
 
-// exp(-sigma_t * distance). Returns 1 for sigma_t == 0 or distance <= 0.
+// exp(-sigma_t * distance). Returns 1 for zero extinction or distance.
+// Rejects negative or nonfinite arguments.
 double analytic_homogeneous_transmittance(double sigma_t, double distance);
 
 // Unbiased ratio-tracking estimate of exp(-integral of sigma_t along segment).
