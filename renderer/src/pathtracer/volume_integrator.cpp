@@ -1,3 +1,4 @@
+#include "volume/direct_lighting.h"
 #include "pathtracer.h"
 #include "scene/light.h"
 #include <algorithm>
@@ -16,28 +17,11 @@ double PathTracer::medium_transmittance(const Ray& shadow, Volume::RNG& rng) con
 
 Vector3D PathTracer::volume_direct_lighting(const Vector3D& position,
     const Vector3D& incoming, Volume::RNG& rng) const {
-  Vector3D result(0.0);
-  // Every light is sampled, so there is no additional light-selection PDF.
-  for (auto light : scene->lights) {
-    const size_t count = light->is_delta_light() ? 1 : ns_area_light;
-    if (!count) continue;
-    Vector3D sum(0.0);
-    for (size_t sample = 0; sample < count; ++sample) {
-      Vector3D wi;
-      double distance = 0.0, pdf = 0.0;
-      const Vector3D Li = light->sample_L(position, &wi, &distance, &pdf);
-      if (!(pdf > 0.0) || !std::isfinite(pdf) || !(distance > EPS_F)) continue;
-      Ray shadow(position, wi.unit());
-      shadow.min_t = EPS_F;
-      shadow.max_t = distance - EPS_F;
-      // Visibility is separate from attenuation. Bounds never block light.
-      if (bvh->has_intersection(shadow)) continue;
-      sum += Li * (phase->evaluate(incoming, shadow.d) *
-                   medium_transmittance(shadow, rng) / pdf);
-    }
-    result += sum / double(count);
-  }
-  return result;
+  return Volume::direct_volume_lighting(position, incoming, *phase,
+      scene->lights, *bvh, ns_area_light, rng,
+      [this](const Ray& shadow, Volume::RNG& r) {
+        return medium_transmittance(shadow, r);
+      });
 }
 
 Vector3D PathTracer::surface_direct_lighting_volume(const Ray& ray,
