@@ -1,4 +1,5 @@
 #include "medium.h"
+#include "cloud_medium.h"
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -77,6 +78,7 @@ Settings load_settings(const std::string& filename) {
   Settings result;
   Vector3D lo, hi;
   double density = 1.0, scale = 0.0, albedo = 0.0;
+  int cloud_resolution = 0;
   std::set<std::string> seen;
   std::string text;
   size_t line_number = 0;
@@ -92,6 +94,8 @@ Settings load_settings(const std::string& filename) {
     if (key == "bounds_min") valid = bool(line >> lo.x >> lo.y >> lo.z);
     else if (key == "bounds_max") valid = bool(line >> hi.x >> hi.y >> hi.z);
     else if (key == "density") valid = bool(line >> density);
+    else if (key == "cloud_resolution")
+      valid = bool(line >> cloud_resolution) && cloud_resolution >= 3 && cloud_resolution <= 256;
     else if (key == "extinction_scale") valid = bool(line >> scale);
     else if (key == "albedo") valid = bool(line >> albedo);
     else if (key == "seed") {
@@ -107,7 +111,15 @@ Settings load_settings(const std::string& filename) {
   }
   for (const auto& required : {"bounds_min", "bounds_max", "extinction_scale", "albedo"})
     if (!seen.count(required)) throw std::runtime_error(filename + ": Missing key " + required);
-  result.medium = std::make_shared<HomogeneousMedium>(BBox(lo, hi), density, scale, albedo);
+  const BBox bounds(lo, hi);
+  if (cloud_resolution) {
+    if (!std::isfinite(density) || density < 0 || !std::isfinite(scale) || scale < 0)
+      throw std::runtime_error(filename + ": Cloud density and extinction scale must be finite and nonnegative");
+    result.medium = std::make_shared<CloudMedium>(
+        CloudMedium::procedural(bounds, cloud_resolution, result.seed, density * scale, albedo));
+  } else {
+    result.medium = std::make_shared<HomogeneousMedium>(bounds, density, scale, albedo);
+  }
   return result;
 }
 } }
