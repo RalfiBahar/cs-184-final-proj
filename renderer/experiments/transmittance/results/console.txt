@@ -1,0 +1,51 @@
+Reference checks (Simpson quadrature vs exact optical depth)
+  [ok]   vacuum_density_zero: quadrature 0.000000 vs exact 0.000000
+  [ok]   zero_length_segment: quadrature 0.000000 vs exact 0.000000
+  [ok]   homog_tau_0.25: quadrature 0.250000 vs exact 0.250000
+  [ok]   homog_tau_1: quadrature 1.000000 vs exact 1.000000
+  [ok]   homog_tau_4: quadrature 4.000000 vs exact 4.000000
+  [ok]   homog_camera_inside: quadrature 1.500000 vs exact 1.500000
+  [ok]   homog_oblique_ray: quadrature 2.500000 vs exact 2.500000
+  [ok]   homog_blocker_inside: quadrature 0.800000 vs exact 0.800000
+  [ok]   ramp_up_a0.2_b2: quadrature 1.100000 vs exact 1.100000
+  [ok]   ramp_down_a0.2_b2: quadrature 1.100000 vs exact 1.100000
+  [ok]   ramp_oblique: quadrature 2.062500 vs exact 2.062500
+  [ok]   ramp_steep_a0_b6: quadrature 3.000000 vs exact 3.000000
+  [ok]   ramp_blocker_inside: quadrature 0.444000 vs exact 0.444000
+
+Stochastic estimators, 1000000 trials each, base seed 184
+fixture                 estimator                       mean    std_error     analytic        z  result
+vacuum_density_zero     ratio_tracking                     1            0            1        0  pass
+vacuum_density_zero     delta_tracking_escape              1            0            1        0  pass
+zero_length_segment     ratio_tracking                     1            0            1        0  pass
+zero_length_segment     delta_tracking_escape              1            0            1        0  pass
+homog_tau_0.25          ratio_tracking              0.7788130.00041504636   0.77880078   0.0294  pass
+homog_tau_0.25          delta_tracking_escape       0.7786920.00041512741   0.77880078   -0.262  pass
+homog_tau_1             ratio_tracking              0.3676820.00048217443   0.36787944   -0.409  pass
+homog_tau_1             delta_tracking_escape       0.3687430.00048246409   0.36787944     1.79  pass
+homog_tau_4             ratio_tracking               0.018650.00013528561  0.018315639     2.47  pass
+homog_tau_4             delta_tracking_escape       0.0184030.00013440361  0.018315639     0.65  pass
+homog_camera_inside     ratio_tracking              0.2229190.00041620463   0.22313016   -0.507  pass
+homog_camera_inside     delta_tracking_escape       0.2232720.00041643921   0.22313016    0.341  pass
+homog_oblique_ray       ratio_tracking              0.0824860.00027510386  0.082084999     1.46  pass
+homog_oblique_ray       delta_tracking_escape       0.0813040.00027330141  0.082084999    -2.86  pass
+homog_blocker_inside    ratio_tracking              0.4494450.00049743787   0.44932896    0.233  pass
+homog_blocker_inside    delta_tracking_escape       0.4495750.00049745082   0.44932896    0.495  pass
+ramp_up_a0.2_b2         ratio_tracking            0.333075240.00034857151   0.33287108    0.586  pass
+ramp_up_a0.2_b2         delta_tracking_escape       0.3324620.00047109555   0.33287108   -0.868  pass
+ramp_down_a0.2_b2       ratio_tracking            0.332916790.00034833364   0.33287108    0.131  pass
+ramp_down_a0.2_b2       delta_tracking_escape       0.3327860.00047121065   0.33287108   -0.181  pass
+ramp_oblique            ratio_tracking            0.127248630.00022045262   0.12713573    0.512  pass
+ramp_oblique            delta_tracking_escape       0.1275330.00033356908   0.12713573     1.19  pass
+ramp_steep_a0_b6        ratio_tracking           0.0496843080.00012567701  0.049787068   -0.818  pass
+ramp_steep_a0_b6        delta_tracking_escape       0.0499140.00021776729  0.049787068    0.583  pass
+ramp_blocker_inside     ratio_tracking            0.64099341  0.000296469   0.64146542    -1.59  pass
+ramp_blocker_inside     delta_tracking_escape       0.6419590.00047942428   0.64146542     1.03  pass
+
+Majorant violation is reported
+  [ok]   ratio tracking throws when sigma_t exceeds the majorant
+  [ok]   vacuum returns exactly 1
+  [ok]   empty segment returns exactly 1
+
+Wrote /Users/ralfibahar/Desktop/School/CS 184/cs-184-final-proj/renderer/experiments/transmittance/results/transmittance.csv and timing.csv
+RESULT: all checks passed
